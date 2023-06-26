@@ -27,7 +27,7 @@ class MapController extends GetxController {
   );
 
   var dataList = <math.Point>[].obs;
-  var polylineCoordinates = <PointLatLng>[].obs;
+  var polylineCoordinates = <LatLng>[].obs;
   final googleService = GoogleService();
 
   final pickedLocation = const LatLng(40.677939, -73.941755).obs;
@@ -111,7 +111,9 @@ class MapController extends GetxController {
           dataList.clear();
           encodedPolyline.value = data.routes[0].overview_polyline.points;
           polylineCoordinates.value = PolylinePoints()
-              .decodePolyline(data.routes[0].overview_polyline.points);
+              .decodePolyline(data.routes[0].overview_polyline.points)
+              .map((e) => LatLng(e.latitude, e.longitude))
+              .toList();
           dataList.value =
               List<math.Point>.from(polylineCoordinates.map((element) {
             return math.Point(element.longitude, element.latitude);
@@ -129,7 +131,19 @@ class MapController extends GetxController {
     );
   }
 
-  addPolyLine(RxList<LatLng> polyline) {}
+  addPolyLine(RxList<LatLng> polyline) {
+    polylines.addAllIf(
+      polyline.isNotEmpty,
+      {
+        const PolylineId("polyline"): Polyline(
+          polylineId: const PolylineId("polyline"),
+          color: Colors.red,
+          width: 5,
+          points: polyline,
+        ),
+      },
+    );
+  }
 
   addMarker({
     required LatLng position,
@@ -137,9 +151,25 @@ class MapController extends GetxController {
     required double rotation,
     required BitmapDescriptor descriptor,
     required Offset anchor,
-  }) {}
+  }) {
+    markers.addAll({
+      MarkerId(id): Marker(
+        markerId: MarkerId(id),
+        position: position,
+        rotation: rotation,
+        icon: descriptor,
+        anchor: anchor,
+      ),
+    });
+  }
 
-  updateCameraPositionForNavigation() {}
+  updateCameraPositionForNavigation() async {
+    googleMapsController.value.future.then(
+      (controller) => controller.animateCamera(
+        CameraUpdate.newLatLngBounds(latLngBounds.value!, 50),
+      ),
+    );
+  }
 
   algo() async {
     var polyline = <LatLng>[].obs;
@@ -178,7 +208,7 @@ class MapController extends GetxController {
         polyline.clear();
         polyline.value = [
           LatLng(l.latitude!, l.longitude!),
-          ...polylineCoordinates.map((e) => LatLng(e.latitude, e.longitude)),
+          ...polylineCoordinates,
         ];
 
         addPolyLine(polyline);
